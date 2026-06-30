@@ -1,0 +1,457 @@
+---
+format:
+  revealjs:
+    auto-stretch: false
+    margin: 0
+    slide-number: true
+    scrollable: true
+    preview-links: auto
+    page-layout: custom
+    logo: imagenes/logo_portada2.png
+    css: ine_quarto_styles.css
+
+jupyter: curso-cd-ia
+code-annotations: hover
+---
+
+
+#
+
+[<img src="imagenes/logo_portada2.png" width="20%"/>]{.center-justified}
+
+[**Usando LLMs en la práctica**]{.big-par .center-justified}
+
+[**Área de Ciencia de Datos**]{.big-par .center-justified}
+
+[**Unidad de Gobierno de Datos**]{.big-par .center-justified}
+
+
+[**Julio 2026**]{.big-par .center-justified}
+
+
+
+
+## Temario de hoy
+
+::: {.medium-par .incremental}
+Después de entender cómo funcionan las redes para secuencias, hoy damos un giro **práctico**: cómo **usar LLMs** en el trabajo diario de una institución pública, de forma efectiva y responsable.
+
+1. Del Transformer al Chatbot
+2. Cómo elegir LLM
+3. Buenas prácticas
+4. Intro a OpenRouter / conexión desde el código
+5. Editando texto a escala a través de API
+:::
+
+::: {.fragment .nota-box}
+La clase anterior fue intensa en teoría (RNN, LSTM, backpropagation). Esta es lo contrario: poca álgebra, mucho **"cómo lo uso"**.
+:::
+
+
+# Del Transformer al Chatbot
+
+## Un Transformer solo predice la siguiente palabra
+
+::: {.incremental .medium-par}
+-   Un LLM "base" (recién pre-entrenado) es, en el fondo, un **autocompletado gigante**: dado un texto, predice el **siguiente token** más probable, una y otra vez.
+
+-   Eso lo hace muy bueno **continuando** texto, pero no necesariamente **respondiendo**.
+
+-   Si le escribes *"¿Cuál es la capital de Francia?"*, un modelo base podría **seguir con más preguntas** (porque en internet las preguntas suelen venir en listas) en vez de contestar *"París"*.
+:::
+
+::: {.fragment .concepto-box}
+Predecir la siguiente palabra ≠ ser un asistente útil. Falta **alinear** al modelo para que se comporte como un ayudante que responde lo que le pides, en el tono adecuado.
+:::
+
+![](imagenes/autocomplete_vs_chat.png){fig-align="center" width="60%"}
+
+## Tres etapas hasta el asistente
+
+::: {.incremental .medium-par}
+1.  **Pre-entrenamiento**: predecir el siguiente token sobre **enormes** corpus de texto. El modelo adquiere gramática, hechos y "conocimiento del mundo", pero todavía **no sabe comportarse** como asistente.
+
+2.  **Fine-tuning supervisado** (SFT / *instruction tuning*): se le muestran muchos pares **(instrucción → buena respuesta)** escritos por personas. Aprende el **formato** de "me piden algo y respondo de forma útil".
+
+3.  **RLHF** (*Reinforcement Learning from Human Feedback*): personas **rankean** varias respuestas del modelo; con esos rankings se entrena un **modelo de recompensa**, y luego se ajusta el LLM para producir lo que la gente **prefiere** (más útil, mejor tono, más seguro).
+:::
+
+![](imagenes/pretrain_sft_rlhf.png){fig-align="center" width="70%"}
+
+::: {.fragment .concepto-box}
+Ese ajuste (SFT + RLHF) es lo que convierte un **autocompletador** en un **chatbot** como ChatGPT, Claude o Gemini.
+:::
+
+::: {.callout-note .small-callout .fragment}
+## Sin álgebra
+Aquí solo nos quedamos con la **intuición**. La idea clave: el mismo Transformer que predice tokens, **afinado** con ejemplos y preferencias humanas, se transforma en un asistente.
+:::
+
+::: notes
+Mencionar que existen variantes más modernas de la última etapa (DPO, RLAIF) pero la intuición es la misma: optimizar hacia respuestas que las personas prefieren.
+:::
+
+
+# Cómo elegir LLM
+
+## No existe "el mejor modelo"
+
+::: {.incremental .medium-par}
+-   Existe el **mejor modelo para tu tarea**, considerando **cuatro** ejes:
+
+    -   **Inteligencia / calidad** en esa tarea concreta.
+    -   **Costo** (se paga por token).
+    -   **Velocidad / latencia**.
+    -   **Privacidad** (¿puedo mandar estos datos afuera?).
+
+-   Un modelo enorme y carísimo es un desperdicio para corregir ortografía; un modelo chico se queda corto para razonamiento complejo.
+:::
+
+::: {.fragment .concepto-box}
+La pregunta correcta no es *"¿cuál es el mejor?"* sino *"¿cuál es el **más barato y rápido** que resuelve **bien** esta tarea?"*.
+:::
+
+## LMArena: preferencia humana
+
+:::: columns
+
+::: {.column width=55%}
+
+::: {.incremental .small-par}
+-   **LMArena** (ex *Chatbot Arena* / LMSYS): le haces la misma pregunta a **dos modelos anónimos** y votas cuál respondió mejor.
+
+-   Con miles de votos a ciegas se arma un **ranking estilo Elo** (como el ajedrez).
+
+-   Mide algo difícil de capturar con benchmarks: **qué tan útiles le parecen las respuestas a las personas**.
+
+-   Hay rankings por categoría (código, matemáticas, escritura, etc.).
+:::
+
+::: {.fragment .small-par}
+🔗 [lmarena.ai](https://lmarena.ai)
+:::
+
+:::
+
+::: {.column width=45%}
+![](imagenes/lmarena.png){fig-align="center" width="100%"}
+:::
+
+::::
+
+## Artificial Analysis: costo vs. inteligencia
+
+:::: columns
+
+::: {.column width=55%}
+
+::: {.incremental .small-par}
+-   **Artificial Analysis** agrega muchos *benchmarks* en un único **Intelligence Index** (un puntaje de "inteligencia").
+
+-   Lo más útil: grafica ese puntaje contra el **precio** y la **velocidad** (tokens/seg), así que de un vistazo ves el **balance costo/calidad**.
+
+-   Ideal para responder: *"de los modelos que son **suficientemente buenos**, ¿cuál es el más barato y rápido?"*.
+:::
+
+::: {.fragment .small-par}
+🔗 [artificialanalysis.ai](https://artificialanalysis.ai)
+:::
+
+:::
+
+::: {.column width=45%}
+![](imagenes/aa_cost_vs_intelligence.png){fig-align="center" width="100%"}
+:::
+
+::::
+
+::: {.fragment .concepto-box}
+**Heurística práctica**: usa el modelo **más barato que sea "suficientemente bueno"**. Reserva los modelos frontera (caros) para razonamiento difícil; usa modelos chicos y rápidos para tareas **masivas y simples** (como la corrección de texto que veremos al final).
+:::
+
+::: {.callout-note .small-callout .fragment}
+## Propietarios vs. open-weight
+También importa si el modelo es **propietario** (solo vía API: GPT, Claude, Gemini) o de **pesos abiertos** (Llama, Qwen, DeepSeek, Gemma), que puedes **descargar y correr tú mismo**. Esto último es clave para la privacidad (lo vemos en un momento).
+:::
+
+
+# Buenas prácticas
+
+## Trabajar bien con LLMs
+
+::: {.incremental .medium-par}
+-   **Contexto lo es todo**: el modelo es *stateless*, en **cada** llamada le mandas todo el contexto que necesita. No "recuerda" la conversación anterior salvo que se la vuelvas a enviar.
+
+-   Da **instrucciones claras**: define un rol (*system prompt*), explicita el formato de salida y, si ayuda, incluye **ejemplos** (*few-shot*). *Garbage in, garbage out*.
+
+-   **Temperatura baja** (≈ 0) para tareas estructuradas, extracción o corrección (quieres consistencia, no creatividad).
+
+-   **Costo**: pagas por token de **entrada + salida**. Inofensivo en una prueba, relevante al procesar miles de filas.
+
+-   **Alucinaciones**: el modelo puede inventar con total seguridad. **Verifica** las salidas y mantén un **humano en el loop**.
+
+-   **Reproducibilidad**: registra el **prompt** y la **versión del modelo** que usaste.
+:::
+
+## Protección de datos {#proteccion-datos}
+
+::: {.medium-par}
+Somos una **institución pública**: trabajamos con datos de personas y empresas.
+:::
+
+::: {.callout-important .small-callout}
+## Antes de enviar algo a una API externa
+Pregúntate siempre: *¿qué dato es esto y **dónde** se va a procesar?* Muchas APIs corren en **servidores en el extranjero**. **No** podemos mandar datos personales o confidenciales a la nube fuera del país.
+:::
+
+:::: columns
+
+::: {.column width=55%}
+
+::: {.incremental .small-par}
+-   **Anonimizar / seudonimizar** antes de enviar: quitar RUT, nombres, direcciones, folios. Si el modelo no necesita el dato identificador, **no se lo mandes**.
+
+-   **Modelos locales / on-prem** para datos sensibles: corre el modelo en infraestructura propia, los datos **nunca salen**.
+
+    -   **Ollama**: fácil, para correr modelos open-weight en tu equipo.
+    -   **vLLM**: servidor para producción.
+
+-   **Lee las políticas** de retención y de entrenamiento del proveedor (¿guardan tus prompts?, ¿entrenan con ellos?).
+:::
+
+:::
+
+::: {.column width=45%}
+![](imagenes/nube_vs_local.png){fig-align="center" width="100%"}
+:::
+
+::::
+
+::: {.fragment .nota-box}
+Marco legal en Chile: **Ley 19.628** sobre protección de la vida privada y la **nueva ley de datos personales**. Ante la duda, trata el dato como sensible y consulta con gobierno de datos.
+:::
+
+::: notes
+Recalcar: la regla de oro es que un dato identificable de una persona no debería salir hacia un servidor en el extranjero. Si se necesita procesar texto con datos sensibles, la vía es un modelo local.
+:::
+
+
+# OpenRouter
+
+## ¿Qué es OpenRouter?
+
+::: {.medium-par .incremental}
+-   Una **API única** para hablar con **cientos de modelos** de muchos proveedores (OpenAI, Anthropic, Google, Meta, DeepSeek, …).
+
+-   **Una sola API key** y **una sola cuenta de facturación** para todos.
+
+-   Cambiar de modelo = **cambiar un string** (`"openai/gpt-4o"` → `"anthropic/claude-3.5-haiku"`). No reescribes el código.
+
+-   Es **compatible con la API de OpenAI**, así que funciona con herramientas que ya conoces.
+:::
+
+::: {.fragment .concepto-box}
+Perfecto para **aprender y comparar**: pruebas el mismo prompt en varios modelos sin crear una cuenta en cada proveedor. 🔗 [openrouter.ai](https://openrouter.ai)
+:::
+
+![](imagenes/openrouter.png){fig-align="center" width="55%"}
+
+::: notes
+Mostrar en vivo la página de openrouter.ai: el catálogo de modelos, los precios por millón de tokens y la página de cada modelo.
+:::
+
+## Conectarse — opción A: `requests`
+
+::: {.small-par}
+La forma más "cruda": un **POST** HTTP al endpoint. Útil para ver **qué viaja** realmente.
+:::
+
+```{python}
+#| echo: true
+#| eval: false
+import os
+import requests
+
+# La key NUNCA se escribe en el código: se lee de una variable de entorno.
+API_KEY = os.environ["OPENROUTER_API_KEY"]
+
+respuesta = requests.post(
+    url="https://openrouter.ai/api/v1/chat/completions",
+    headers={"Authorization": f"Bearer {API_KEY}"},
+    json={
+        "model": "openai/gpt-4o-mini",            # <- el id del modelo es solo un string
+        "messages": [
+            {"role": "system", "content": "Eres un asistente conciso."},
+            {"role": "user", "content": "Explica qué es el INE en una frase."},
+        ],
+    },
+)
+
+data = respuesta.json()
+print(data["choices"][0]["message"]["content"])
+```
+
+::: {.fragment .small-par}
+Respuesta (ilustrativa):
+:::
+
+```{python}
+#| echo: true
+#| eval: false
+# El Instituto Nacional de Estadísticas (INE) es el organismo público de Chile
+# encargado de producir las estadísticas oficiales del país.
+```
+
+## Conectarse — opción B: SDK de `openai` (recomendado)
+
+::: {.small-par}
+Como OpenRouter es **compatible con OpenAI**, podemos usar su SDK y solo cambiar la `base_url`. Más limpio y maneja los detalles por nosotros.
+:::
+
+```{python}
+#| echo: true
+#| eval: false
+# pip install openai
+import os
+from openai import OpenAI
+
+client = OpenAI(
+    base_url="https://openrouter.ai/api/v1",   # <- apuntamos a OpenRouter
+    api_key=os.environ["OPENROUTER_API_KEY"],
+)
+
+resp = client.chat.completions.create(
+    model="anthropic/claude-3.5-haiku",        # <- cambiar de modelo = cambiar este string
+    messages=[
+        {"role": "system", "content": "Eres un asistente conciso."},
+        {"role": "user", "content": "Explica qué es el INE en una frase."},
+    ],
+    temperature=0,
+)
+
+print(resp.choices[0].message.content)
+```
+
+::: {.fragment .nota-box}
+El id del modelo (`proveedor/modelo`) lo eliges en [openrouter.ai/models](https://openrouter.ai/models). Para tareas masivas conviene un modelo **barato y rápido**; lo demostramos a continuación.
+:::
+
+
+# Editando texto a escala a través de API
+
+## El problema: texto con errores
+
+::: {.small-par}
+Imaginemos una columna de texto (respuestas, glosas, observaciones) con errores de ortografía y gramática. Queremos una versión **corregida** de cada fila.
+:::
+
+```{python}
+#| echo: true
+import pandas as pd
+
+df = pd.DataFrame({
+    "texto": [
+        "el ministro dijo q los datos staban malos",
+        "ay que revizar la imformacion antes de publicarla",
+        "los encuestados no kisieron responde la pregunta",
+        "se obserbo un aumento en la poblacion ocupada",
+        "la enbcuesta se aplico en todas las rejiones del pais",
+    ]
+})
+df
+```
+
+## La función de corrección
+
+::: {.small-par}
+Una función que recibe un texto, arma el prompt y devuelve la versión corregida. Usamos `temperature=0` para que sea **consistente**.
+:::
+
+```{python}
+#| echo: true
+#| eval: false
+from openai import OpenAI
+import os
+
+client = OpenAI(
+    base_url="https://openrouter.ai/api/v1",
+    api_key=os.environ["OPENROUTER_API_KEY"],
+)
+
+SYSTEM = (
+    "Eres un corrector de textos en español. Corrige la ortografía y la "
+    "gramática del texto del usuario. Devuelve SOLO el texto corregido, "
+    "sin comillas ni explicaciones."
+)
+
+def corregir(texto: str) -> str:
+    resp = client.chat.completions.create(
+        model="openai/gpt-4o-mini",          # modelo barato: la tarea es simple
+        messages=[
+            {"role": "system", "content": SYSTEM},
+            {"role": "user", "content": texto},
+        ],
+        temperature=0,
+    )
+    return resp.choices[0].message.content.strip()
+
+# Aplicamos la función a cada fila -> nueva columna
+df["texto_corregido"] = df["texto"].apply(corregir)
+df
+```
+
+## El resultado
+
+::: {.small-par}
+Cada fila pasó por el modelo y obtuvimos su versión corregida:
+:::
+
+```{python}
+#| echo: false
+# Columna pre-generada para mostrar el antes/después sin llamar a la API en el render.
+df["texto_corregido"] = [
+    "El ministro dijo que los datos estaban malos.",
+    "Hay que revisar la información antes de publicarla.",
+    "Los encuestados no quisieron responder la pregunta.",
+    "Se observó un aumento en la población ocupada.",
+    "La encuesta se aplicó en todas las regiones del país.",
+]
+df
+```
+
+::: {.nota-box}
+Para que estas diapositivas se generen sin necesitar una API key ni conexión, la columna `texto_corregido` está **pre-generada**. En la práctica, la produce la llamada a `corregir()` de la slide anterior.
+:::
+
+## Escalar con cuidado
+
+::: {.concepto-box}
+Pasar de 5 filas a 50.000 cambia las prioridades:
+:::
+
+::: {.incremental .medium-par}
+-   **Costo**: multiplica el costo por fila por el total. Estima antes de lanzar todo.
+-   **Rate limits**: el proveedor limita llamadas por minuto → procesa por lotes y agrega pausas.
+-   **Reintentos**: una llamada puede fallar (red, límite). Implementa **reintentos con *backoff***.
+-   **Manejo de errores**: decide qué hacer con una fila que falla (reintentar, marcar, omitir) sin botar todo el proceso.
+-   **`temperature=0`**: consistencia y resultados reproducibles.
+-   **Salida estructurada (JSON)**: cuando necesitas más que texto plano (p. ej. `{"corregido": ..., "cambios": [...]}`), pide salida en JSON para parsearla directo.
+:::
+
+::: {.fragment .nota-box}
+Y, antes de todo: ¿estos textos contienen **datos personales**? Si es así, vuelve a la slide de [protección de datos](#proteccion-datos) — anonimiza o usa un modelo **local**.
+:::
+
+
+#
+
+[<img src="imagenes/logo_portada2.png" width="20%"/>]{.center-justified}
+
+[**Usando LLMs en la práctica**]{.big-par .center-justified}
+
+[**Área de Ciencia de Datos**]{.big-par .center-justified}
+
+[**Unidad de Gobierno de Datos**]{.big-par .center-justified}
+
+
+[**Julio 2026**]{.big-par .center-justified}
